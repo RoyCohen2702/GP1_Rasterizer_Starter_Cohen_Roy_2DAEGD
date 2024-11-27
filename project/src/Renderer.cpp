@@ -8,6 +8,9 @@
 #include "Texture.h"
 #include "Utils.h"
 
+
+#include <iostream>
+
 using namespace dae;
 
 Renderer::Renderer(SDL_Window* pWindow) :
@@ -21,7 +24,7 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pBackBuffer = SDL_CreateRGBSurface(0, m_Width, m_Height, 32, 0, 0, 0, 0);
 	m_pBackBufferPixels = (uint32_t*)m_pBackBuffer->pixels;
 
-	//m_pDepthBufferPixels = new float[m_Width * m_Height];
+	m_pDepthBufferPixels = new float[m_Width * m_Height];
 
 	//Initialize Camera
 	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
@@ -29,7 +32,7 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 Renderer::~Renderer()
 {
-	//delete[] m_pDepthBufferPixels;
+	delete[] m_pDepthBufferPixels;
 }
 
 void Renderer::Update(Timer* pTimer)
@@ -43,62 +46,114 @@ void Renderer::Render()
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
+	//Clear BackBuffer
+	Uint32 clearColor = SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100);
+	SDL_FillRect(m_pBackBuffer, nullptr, clearColor);
+
 	//RENDER LOGIC
-	std::vector<Vector3> vertices_NDC{
-		{	0.f,	0.5f,	1.f},
-		{	.5f,	-.5f,	1.f},
-		{	-.5f,	-.5f,	1.f}
+	//std::vector<Vector3> vertices_NDC{
+	//	{	0.0f,	0.5f,	1.f},
+	//	{	0.5f,	-.5f,	1.f},
+	//	{	-.5f,	-.5f,	1.f}
+	//};
+
+	std::vector<Vertex> vertices_World{
+		// Triangle 0
+		{{	 0.f,	2.f,	0.f	}, {	1,	0,	0	}},
+		{{	 1.5f,	-1.f,	0.f	}, {	1,	0,	0	}},
+		{{	-1.5f,	-1.f,	0.f	}, {	1,	0,	0	}},
+
+		// Triangle 1
+		{{	 0.f,	4.f,	2.f	}, {	1,	0,	0	}},
+		{{	 3.f,	-2.f,	2.f	}, {	0,	1,	0	}},
+		{{	-3.f,	-2.f,	2.f	}, {	0,	0,	1	}}
 	};
 
-	for (int px{}; px < m_Width; ++px)
-	{
-		for (int py{}; py < m_Height; ++py)
-		{
-			ColorRGB finalColor{ colors::Black };
+	std::vector<Vertex> vertices_NDC{};
 
-			//float gradient = px / static_cast<float>(m_Width);
-			//gradient += py / static_cast<float>(m_Width);
-			//gradient /= 2.0f;
-			
-			Vector2 P{ px + 0.5f, py + 0.5f };
-			
-			for (size_t i = 0; i < vertices_NDC.size(); i+=3)
+	m_Camera.CalculateViewMatrix();
+	VertexTransformationFunction(vertices_World, vertices_NDC);
+
+
+	for (size_t i = 0; i < m_Width * m_Height; ++i) {
+		m_pDepthBufferPixels[i] = std::numeric_limits<float>::max();
+	}
+
+	for (size_t i = 0; i < vertices_NDC.size(); i += 3)
+	{
+		// Vertices
+		Vector2 v0{ vertices_NDC[i].position.x,		vertices_NDC[i].position.y };
+		Vector2 v1{ vertices_NDC[i + 1].position.x, vertices_NDC[i + 1].position.y };
+		Vector2 v2{ vertices_NDC[i + 2].position.x, vertices_NDC[i + 2].position.y };
+
+		// NDC Coordinates
+		Vector2 A{ ((v0.x + 1) / 2) * m_Width, ((1 - v0.y) / 2) * m_Height };
+		Vector2 B{ ((v1.x + 1) / 2) * m_Width, ((1 - v1.y) / 2) * m_Height };
+		Vector2 C{ ((v2.x + 1) / 2) * m_Width, ((1 - v2.y) / 2) * m_Height };
+
+		// Edges
+		Vector2 edge0 = B - A;
+		Vector2 edge1 = C - B;
+		Vector2 edge2 = A - C;
+
+
+		for (int px{}; px < m_Width; ++px)
+		{
+			for (int py{}; py < m_Height; ++py)
 			{
-				Vector3 v0{ vertices_NDC[i]	};
-				Vector3 v1{ vertices_NDC[i + 1]	};
-				Vector3 v2{ vertices_NDC[i + 2]	};
-			
-			
-				Vector2 A{ ((v0.x + 1) / 2) * m_Width, ((1 - v0.y) / 2) * m_Height };
-				Vector2 B{ ((v1.x + 1) / 2) * m_Width, ((1 - v1.y) / 2) * m_Height };
-				Vector2 C{ ((v2.x + 1) / 2) * m_Width, ((1 - v2.y) / 2) * m_Height };
-			
-				Vector2 edge0 =  B - A ;
-				Vector2 edge1 =  C - B ;
-				Vector2 edge2 =  A - C ;
-			
+				ColorRGB finalColor{ colors::Black};
+				Vector2 P{ px + 0.5f, py + 0.5f };
+
+				// Direction from NDC to P(ixel Point)
 				Vector2 AP = P - A;
 				Vector2 BP = P - B;
-				Vector2 CP = P - C; 
-			
-				if (Vector2::Cross(edge0, AP) >= 0.f &&
-					Vector2::Cross(edge1, BP) >= 0.f &&
-					Vector2::Cross(edge2, CP) >= 0.f)
-				{
-			
-					finalColor = colors::White;
+				Vector2 CP = P - C;
+
+				// Barycentric weights
+				float w0 = (Vector2::Cross(edge1, BP));
+				float w1 = (Vector2::Cross(edge2, CP));
+				float w2 = (Vector2::Cross(edge0, AP));
+
+				// Total Triangle Area 
+				float total = w0 + w1 + w2;
+
+				w0 /= total;
+				w1 /= total;
+				w2 /= total;
+
+				//// Check if inside triangle (area of parallelogram)
+				//float area0{ Vector2::Cross(edge0, AP) };
+				//float area1{ Vector2::Cross(edge1, BP) };
+				//float area2{ Vector2::Cross(edge2, CP) };
+				
+
+				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
+				{	
+					// Interpolate Depth
+					float depth =	w0 * vertices_NDC[i].position.z +
+									w1 * vertices_NDC[i + 1].position.z +
+									w2 * vertices_NDC[i + 2].position.z;
+
+					int pixelIndex = py * m_Width + px;
+
+					// Depth check
+					if (depth < m_pDepthBufferPixels[pixelIndex])
+					{
+						finalColor += vertices_NDC[i].color * w0 + vertices_NDC[i + 1].color * w1 + vertices_NDC[i + 2].color * w2;
+
+						// Depth write
+						m_pDepthBufferPixels[pixelIndex] = depth;
+
+						//Update Color in Buffer
+						finalColor.MaxToOne();
+
+						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+							static_cast<uint8_t>(finalColor.r * 255),
+							static_cast<uint8_t>(finalColor.g * 255),
+							static_cast<uint8_t>(finalColor.b * 255));
+					}
 				}
 			}
-
-
-
-			//Update Color in Buffer
-			finalColor.MaxToOne();
-
-			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-				static_cast<uint8_t>(finalColor.r * 255),
-				static_cast<uint8_t>(finalColor.g * 255),
-				static_cast<uint8_t>(finalColor.b * 255));
 		}
 	}
 
@@ -111,9 +166,45 @@ void Renderer::Render()
 
 void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const
 {
+	vertices_out.resize(vertices_in.size());
+
+	const float FOV{ m_Camera.fov };
+	const float aspectRatio{ float(m_Width) / float(m_Height) };
+
 	//Todo > W1 Projection Stage
+	for (size_t i = 0; i < vertices_in.size(); ++i)
+	{
+		// World Space
+		Vector4 worldSpace{
+			vertices_in[i].position.x,
+			vertices_in[i].position.y,
+			vertices_in[i].position.z,
+			1.f
+		};
+		
+		// View Space
+		Vector4 viewSpace{ m_Camera.viewMatrix.TransformPoint(worldSpace) };
+		
 
+		const float nearPlane = 0.1f;  // Example near clipping plane
+		const float farPlane = 100.0f;
 
+		// Projection Space
+		Vector4 projected{
+			viewSpace.x / (aspectRatio * FOV),
+			viewSpace.y / FOV,
+			(viewSpace.z - nearPlane) / (farPlane - nearPlane),
+			viewSpace.z
+		};
+		
+		// Projection divide 
+		projected.x /= projected.w;
+		projected.y /= projected.w;
+		projected.z /= projected.w;
+
+		vertices_out[i].position = projected;
+		vertices_out[i].color = vertices_in[i].color;
+	}
 }
 
 bool Renderer::SaveBufferToImage() const

@@ -146,7 +146,20 @@ namespace dae {
 	{
 		//TODO W1
 
-		return {};
+		Vector3 f = forward.Normalized();				// Forward vector (view direction)
+		Vector3 r = Vector3::Cross(up, f).Normalized(); // Right vector (camera's right direction)
+		Vector3 u = Vector3::Cross(f, r).Normalized();	// Up vector (camera's up direction)
+
+		float tx = -Vector3::Dot(r, origin);
+		float ty = -Vector3::Dot(up,origin);
+		float tz = Vector3::Dot(forward,origin);
+
+		return Matrix{
+			{r.x, up.x, -forward.x, 0},
+			{r.y, up.y, -forward.y, 0},
+			{r.z, up.z, -forward.z, 0},
+			{tx, ty, tz, 1}
+		};
 	}
 
 	Matrix Matrix::CreatePerspectiveFovLH(float fov, float aspect, float zn, float zf)
