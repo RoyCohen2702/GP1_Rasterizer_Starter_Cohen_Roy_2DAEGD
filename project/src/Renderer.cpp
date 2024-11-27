@@ -96,10 +96,16 @@ void Renderer::Render()
 		Vector2 edge1 = C - B;
 		Vector2 edge2 = A - C;
 
+		// Bounding box
+		int minX = std::max(0, static_cast<int>(std::floor(std::min({ A.x, B.x, C.x }))));
+		int minY = std::max(0, static_cast<int>(std::floor(std::min({ A.y, B.y, C.y }))));
+		
+		int maxX = std::min(m_Width - 1, static_cast<int>(std::ceil(std::max({ A.x, B.x, C.x }))));
+		int maxY = std::min(m_Height - 1, static_cast<int>(std::ceil(std::max({ A.y, B.y, C.y }))));
 
-		for (int px{}; px < m_Width; ++px)
+		for (int px{minX}; px < maxX; ++px)
 		{
-			for (int py{}; py < m_Height; ++py)
+			for (int py{minY}; py < maxY; ++py)
 			{
 				ColorRGB finalColor{ colors::Black};
 				Vector2 P{ px + 0.5f, py + 0.5f };
