@@ -57,16 +57,78 @@ void Renderer::Render()
 	//	{	-.5f,	-.5f,	1.f}
 	//};
 
-	std::vector<Vertex> vertices_World{
-		// Triangle 0
-		{{	 0.f,	2.f,	0.f	}, {	1,	0,	0	}},
-		{{	 1.5f,	-1.f,	0.f	}, {	1,	0,	0	}},
-		{{	-1.5f,	-1.f,	0.f	}, {	1,	0,	0	}},
+	//std::vector<Vertex> vertices_World{
+	//	// Triangle 0
+	//	{{	 0.f,	2.f,	0.f	}, {	1,	0,	0	}},
+	//	{{	 1.5f,	-1.f,	0.f	}, {	1,	0,	0	}},
+	//	{{	-1.5f,	-1.f,	0.f	}, {	1,	0,	0	}},
+	//
+	//	// Triangle 1
+	//	{{	 0.f,	4.f,	2.f	}, {	1,	0,	0	}},
+	//	{{	 3.f,	-2.f,	2.f	}, {	0,	1,	0	}},
+	//	{{	-3.f,	-2.f,	2.f	}, {	0,	0,	1	}}
+	//};
 
-		// Triangle 1
-		{{	 0.f,	4.f,	2.f	}, {	1,	0,	0	}},
-		{{	 3.f,	-2.f,	2.f	}, {	0,	1,	0	}},
-		{{	-3.f,	-2.f,	2.f	}, {	0,	0,	1	}}
+	std::vector<Mesh> meshes_World
+	{
+		Mesh{
+		// Vertices
+			{
+				Vertex{ { -3.f,	 3.f,	-2.f }},
+				Vertex{ { 0.f,	 3.f,	-2.f }},
+				Vertex{ { 3.f,	 3.f,	-2.f }},
+				Vertex{ { -3.f,	 0.f,	-2.f }},
+				Vertex{ { 0.f,	 0.f,	-2.f }},
+				Vertex{ { 3.f,	 0.f,	-2.f }},
+				Vertex{ { -3.f,	-3.f,	-2.f }},
+				Vertex{ { 0.f,	-3.f,	-2.f }},
+				Vertex{ { 3.f,	-3.f,	-2.f }}
+			},
+	
+		// Indices
+			{	
+				3, 0, 1,	1, 4, 3,	4, 1, 2,
+				2, 5, 4,	6, 3, 4,	4, 7, 6,
+				7, 4, 5,	5, 8, 7
+			},	
+	
+		// Topology
+			PrimitiveTopology::TriangleList
+		},
+
+		Mesh{
+		// Vertices
+			{
+				Vertex{ { -3.f,	 3.f,	-2.f }},
+				Vertex{ { 0.f,	 3.f,	-2.f }},
+				Vertex{ { 3.f,	 3.f,	-2.f }},
+				Vertex{ { -3.f,	 0.f,	-2.f }},
+				Vertex{ { 0.f,	 0.f,	-2.f }},
+				Vertex{ { 3.f,	 0.f,	-2.f }},
+				Vertex{ { -3.f,	-3.f,	-2.f }},
+				Vertex{ { 0.f,	-3.f,	-2.f }},
+				Vertex{ { 3.f,	-3.f,	-2.f }}
+			},
+		// Indices
+			{
+				3, 0, 4, 1, 5, 2,
+				2, 6,
+				6, 3, 7, 4, 8, 5
+			},
+		// Topology
+			PrimitiveTopology::TriangleStrip
+		}
+	};
+
+	int meshIndex{ 1 };
+	PrimitiveTopology topology{ meshes_World[meshIndex].primitiveTopology};
+
+	std::vector<Vertex>& vertices_World{
+		meshes_World[meshIndex].vertices
+	};
+
+	std::vector<uint32_t>& indices{
+		meshes_World[meshIndex].indices
 	};
 
 	std::vector<Vertex> vertices_NDC{};
@@ -74,17 +136,33 @@ void Renderer::Render()
 	m_Camera.CalculateViewMatrix();
 	VertexTransformationFunction(vertices_World, vertices_NDC);
 
+	
 
 	for (size_t i = 0; i < m_Width * m_Height; ++i) {
 		m_pDepthBufferPixels[i] = std::numeric_limits<float>::max();
 	}
 
-	for (size_t i = 0; i < vertices_NDC.size(); i += 3)
+	// Rasterization
+	uint16_t size = indices.size() - (topology == PrimitiveTopology::TriangleList ? 0 : 2);
+
+	for (size_t i = 0; i < size; i += (topology == PrimitiveTopology::TriangleList ? 3 : 1))
 	{
 		// Vertices
-		Vector2 v0{ vertices_NDC[i].position.x,		vertices_NDC[i].position.y };
-		Vector2 v1{ vertices_NDC[i + 1].position.x, vertices_NDC[i + 1].position.y };
-		Vector2 v2{ vertices_NDC[i + 2].position.x, vertices_NDC[i + 2].position.y };
+		Vector2 v0{};
+		Vector2 v1{};
+		Vector2 v2{};
+
+		if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
+			v0 = { vertices_NDC[indices[i]].position.x,	 vertices_NDC[indices[i]].position.y };
+			v1 = { vertices_NDC[indices[i + 2]].position.x, vertices_NDC[indices[i + 2]].position.y };
+			v2 = { vertices_NDC[indices[i + 1]].position.x, vertices_NDC[indices[i + 1]].position.y }; 
+		}
+		else {
+			v0 = { vertices_NDC[indices[i]].position.x,	 vertices_NDC[indices[i]].position.y };
+			v1 = { vertices_NDC[indices[i + 1]].position.x, vertices_NDC[indices[i + 1]].position.y };
+			v2 = { vertices_NDC[indices[i + 2]].position.x, vertices_NDC[indices[i + 2]].position.y };
+		}
+
 
 		// NDC Coordinates
 		Vector2 A{ ((v0.x + 1) / 2) * m_Width, ((1 - v0.y) / 2) * m_Height };
@@ -99,15 +177,15 @@ void Renderer::Render()
 		// Bounding box
 		int minX = std::max(0, static_cast<int>(std::floor(std::min({ A.x, B.x, C.x }))));
 		int minY = std::max(0, static_cast<int>(std::floor(std::min({ A.y, B.y, C.y }))));
-		
+
 		int maxX = std::min(m_Width - 1, static_cast<int>(std::ceil(std::max({ A.x, B.x, C.x }))));
 		int maxY = std::min(m_Height - 1, static_cast<int>(std::ceil(std::max({ A.y, B.y, C.y }))));
 
-		for (int px{minX}; px < maxX; ++px)
+		for (int px{ minX }; px < maxX; ++px)
 		{
-			for (int py{minY}; py < maxY; ++py)
+			for (int py{ minY }; py < maxY; ++py)
 			{
-				ColorRGB finalColor{ colors::Black};
+				ColorRGB finalColor{ colors::Black };
 				Vector2 P{ px + 0.5f, py + 0.5f };
 
 				// Direction from NDC to P(ixel Point)
@@ -127,25 +205,25 @@ void Renderer::Render()
 				w1 /= total;
 				w2 /= total;
 
-				//// Check if inside triangle (area of parallelogram)
-				//float area0{ Vector2::Cross(edge0, AP) };
-				//float area1{ Vector2::Cross(edge1, BP) };
-				//float area2{ Vector2::Cross(edge2, CP) };
-				
 
 				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
-				{	
+				{
 					// Interpolate Depth
-					float depth =	w0 * vertices_NDC[i].position.z +
-									w1 * vertices_NDC[i + 1].position.z +
-									w2 * vertices_NDC[i + 2].position.z;
+					float depth = w0 * vertices_NDC[indices[i]].position.z +
+						w1 * vertices_NDC[indices[i + 1]].position.z +
+						w2 * vertices_NDC[indices[i + 2]].position.z;
 
 					int pixelIndex = py * m_Width + px;
 
 					// Depth check
 					if (depth < m_pDepthBufferPixels[pixelIndex])
 					{
-						finalColor += vertices_NDC[i].color * w0 + vertices_NDC[i + 1].color * w1 + vertices_NDC[i + 2].color * w2;
+						if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
+							finalColor += vertices_NDC[indices[i]].color * w0 + vertices_NDC[indices[i + 2]].color * w1 + vertices_NDC[indices[i + 1]].color * w2;
+						}
+						else {
+							finalColor += vertices_NDC[indices[i]].color * w0 + vertices_NDC[indices[i + 1]].color * w1 + vertices_NDC[indices[i + 2]].color * w2;
+						}
 
 						// Depth write
 						m_pDepthBufferPixels[pixelIndex] = depth;
@@ -160,6 +238,7 @@ void Renderer::Render()
 					}
 				}
 			}
+
 		}
 	}
 
@@ -187,12 +266,12 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 			vertices_in[i].position.z,
 			1.f
 		};
-		
+
 		// View Space
 		Vector4 viewSpace{ m_Camera.viewMatrix.TransformPoint(worldSpace) };
-		
 
-		const float nearPlane = 0.1f;  // Example near clipping plane
+
+		const float nearPlane = 0.1f;
 		const float farPlane = 100.0f;
 
 		// Projection Space
@@ -202,7 +281,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 			(viewSpace.z - nearPlane) / (farPlane - nearPlane),
 			viewSpace.z
 		};
-		
+
 		// Projection divide 
 		projected.x /= projected.w;
 		projected.y /= projected.w;
