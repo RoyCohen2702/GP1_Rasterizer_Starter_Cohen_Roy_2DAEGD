@@ -28,11 +28,14 @@ Renderer::Renderer(SDL_Window* pWindow) :
 
 	//Initialize Camera
 	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
+
+	m_pTexture = Texture::LoadFromFile("resources/uv_grid_2.png");
 }
 
 Renderer::~Renderer()
 {
 	delete[] m_pDepthBufferPixels;
+	delete m_pTexture;
 }
 
 void Renderer::Update(Timer* pTimer)
@@ -74,15 +77,15 @@ void Renderer::Render()
 		Mesh{
 		// Vertices
 			{
-				Vertex{ { -3.f,	 3.f,	-2.f }},
-				Vertex{ { 0.f,	 3.f,	-2.f }},
-				Vertex{ { 3.f,	 3.f,	-2.f }},
-				Vertex{ { -3.f,	 0.f,	-2.f }},
-				Vertex{ { 0.f,	 0.f,	-2.f }},
-				Vertex{ { 3.f,	 0.f,	-2.f }},
-				Vertex{ { -3.f,	-3.f,	-2.f }},
-				Vertex{ { 0.f,	-3.f,	-2.f }},
-				Vertex{ { 3.f,	-3.f,	-2.f }}
+				Vertex{ { -3.f,	 3.f,	-2.f }, {colors::White}, {	0,	0	} },
+				Vertex{ { 0.f,	 3.f,	-2.f }, {colors::White}, { .5,	0	} },
+				Vertex{ { 3.f,	 3.f,	-2.f }, {colors::White}, {	1,	0	} },
+				Vertex{ { -3.f,	 0.f,	-2.f }, {colors::White}, {	0, .5	} },
+				Vertex{ { 0.f,	 0.f,	-2.f }, {colors::White}, { .5, .5	} },
+				Vertex{ { 3.f,	 0.f,	-2.f }, {colors::White}, {	1, .5	} },
+				Vertex{ { -3.f,	-3.f,	-2.f }, {colors::White}, {	0,	1	} },
+				Vertex{ { 0.f,	-3.f,	-2.f }, {colors::White}, { .5,	1	} },
+				Vertex{ { 3.f,	-3.f,	-2.f }, {colors::White}, {	1,	1	} }
 			},
 	
 		// Indices
@@ -99,15 +102,15 @@ void Renderer::Render()
 		Mesh{
 		// Vertices
 			{
-				Vertex{ { -3.f,	 3.f,	-2.f }},
-				Vertex{ { 0.f,	 3.f,	-2.f }},
-				Vertex{ { 3.f,	 3.f,	-2.f }},
-				Vertex{ { -3.f,	 0.f,	-2.f }},
-				Vertex{ { 0.f,	 0.f,	-2.f }},
-				Vertex{ { 3.f,	 0.f,	-2.f }},
-				Vertex{ { -3.f,	-3.f,	-2.f }},
-				Vertex{ { 0.f,	-3.f,	-2.f }},
-				Vertex{ { 3.f,	-3.f,	-2.f }}
+				Vertex{ { -3.f,	 3.f,	-2.f }, {colors::White} , {	0,	0	} },
+				Vertex{ { 0.f,	 3.f,	-2.f }, {colors::White} , { .5,	0	} },
+				Vertex{ { 3.f,	 3.f,	-2.f }, {colors::White} , {	1,	0	} },
+				Vertex{ { -3.f,	 0.f,	-2.f }, {colors::White} , {	0, .5	} },
+				Vertex{ { 0.f,	 0.f,	-2.f }, {colors::White} , { .5, .5	} },
+				Vertex{ { 3.f,	 0.f,	-2.f }, {colors::White} , {	1, .5	} },
+				Vertex{ { -3.f,	-3.f,	-2.f }, {colors::White} , {	0,	1	} },
+				Vertex{ { 0.f,	-3.f,	-2.f }, {colors::White} , { .5,	1	} },
+				Vertex{ { 3.f,	-3.f,	-2.f }, {colors::White} , {	1,	1	} }
 			},
 		// Indices
 			{
@@ -120,7 +123,11 @@ void Renderer::Render()
 		}
 	};
 
-	int meshIndex{ 1 };
+	// Mesh Index
+	// -----------------
+	// 0: TriangleList
+	// 1: TriangleStrip
+	int meshIndex{ 0 };
 	PrimitiveTopology topology{ meshes_World[meshIndex].primitiveTopology};
 
 	std::vector<Vertex>& vertices_World{
@@ -133,9 +140,9 @@ void Renderer::Render()
 
 	std::vector<Vertex> vertices_NDC{};
 
+
 	m_Camera.CalculateViewMatrix();
 	VertexTransformationFunction(vertices_World, vertices_NDC);
-
 	
 
 	for (size_t i = 0; i < m_Width * m_Height; ++i) {
@@ -205,25 +212,70 @@ void Renderer::Render()
 				w1 /= total;
 				w2 /= total;
 
-
 				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
 				{
+					// z positions
+					float z0{};
+					float z1{};
+					float z2{};
+
+					if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
+						z0 = vertices_NDC[indices[i]].position.z;
+						z1 = vertices_NDC[indices[i + 2]].position.z;
+						z2 = vertices_NDC[indices[i + 1]].position.z;
+					}
+					else {
+						z0 = vertices_NDC[indices[i]].position.z;
+						z1 = vertices_NDC[indices[i + 1]].position.z;
+						z2 = vertices_NDC[indices[i + 2]].position.z;
+					}
+
 					// Interpolate Depth
-					float depth = w0 * vertices_NDC[indices[i]].position.z +
-						w1 * vertices_NDC[indices[i + 1]].position.z +
-						w2 * vertices_NDC[indices[i + 2]].position.z;
+					float depth =	w0 * z0 +
+									w1 * z1 +
+									w2 * z2;
 
 					int pixelIndex = py * m_Width + px;
 
 					// Depth check
 					if (depth < m_pDepthBufferPixels[pixelIndex])
 					{
+						// Texture
+						Vector2 textureColor{};
 						if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
-							finalColor += vertices_NDC[indices[i]].color * w0 + vertices_NDC[indices[i + 2]].color * w1 + vertices_NDC[indices[i + 1]].color * w2;
+							textureColor = (vertices_NDC[indices[i]].uv * w0 + 
+											vertices_NDC[indices[i + 2]].uv * w1 + 
+											vertices_NDC[indices[i + 1]].uv * w2);
 						}
 						else {
-							finalColor += vertices_NDC[indices[i]].color * w0 + vertices_NDC[indices[i + 1]].color * w1 + vertices_NDC[indices[i + 2]].color * w2;
+							textureColor = (vertices_NDC[indices[i]].uv * w0 +		
+											vertices_NDC[indices[i + 1]].uv * w1 + 
+											vertices_NDC[indices[i + 2]].uv * w2);
 						}
+
+						//std::cout<< textureColor.x << " " << textureColor.y << std::endl;
+
+					//std::cout << vertices_NDC[indices[1]].uv.x << " " << vertices_NDC[indices[1]].uv.y << std::endl;
+						
+
+						finalColor += m_pTexture->Sample(textureColor);
+
+						// Interpolate Color
+						//ColorRGB interpolatedColor;
+						//if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
+						//	interpolatedColor +=	vertices_NDC[indices[i]].color * w0 + 
+						//							vertices_NDC[indices[i + 2]].color * w1 + 
+						//							vertices_NDC[indices[i + 1]].color * w2;
+						//}
+						//else {
+						//	interpolatedColor +=	vertices_NDC[indices[i]].color * w0 + 
+						//							vertices_NDC[indices[i + 1]].color * w1 + 
+						//							vertices_NDC[indices[i + 2]].color * w2;
+						//}
+
+						// Texture Color
+						//finalColor += interpolatedColor * m_pTexture->Sample(textureColor);
+						
 
 						// Depth write
 						m_pDepthBufferPixels[pixelIndex] = depth;
@@ -289,6 +341,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 
 		vertices_out[i].position = projected;
 		vertices_out[i].color = vertices_in[i].color;
+		vertices_out[i].uv = vertices_in[i].uv;
 	}
 }
 
