@@ -215,70 +215,46 @@ void Renderer::Render()
 				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
 				{
 					// z positions
-					float z0{};
+					float z0 = z0 = vertices_NDC[indices[i]].position.z;
 					float z1{};
 					float z2{};
 
 					if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
-						z0 = vertices_NDC[indices[i]].position.z;
 						z1 = vertices_NDC[indices[i + 2]].position.z;
 						z2 = vertices_NDC[indices[i + 1]].position.z;
 					}
 					else {
-						z0 = vertices_NDC[indices[i]].position.z;
 						z1 = vertices_NDC[indices[i + 1]].position.z;
 						z2 = vertices_NDC[indices[i + 2]].position.z;
 					}
 
 					// Interpolate Depth
-					float depth =	w0 * z0 +
-									w1 * z1 +
-									w2 * z2;
+					float interpolatedDepth = 1 / (	(w0 / z0)+ 
+													(w1 / z1)+ 
+													(w2 / z2));	
 
 					int pixelIndex = py * m_Width + px;
 
 					// Depth check
-					if (depth < m_pDepthBufferPixels[pixelIndex])
+					if (interpolatedDepth < m_pDepthBufferPixels[pixelIndex])
 					{
 						// Texture
 						Vector2 textureColor{};
 						if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
-							textureColor = (vertices_NDC[indices[i]].uv * w0 + 
-											vertices_NDC[indices[i + 2]].uv * w1 + 
-											vertices_NDC[indices[i + 1]].uv * w2);
+							textureColor = (((vertices_NDC[indices[i]].uv		/ z0) * w0) +
+											((vertices_NDC[indices[i + 2]].uv	/ z1) * w1) +
+											((vertices_NDC[indices[i + 1]].uv	/ z2) * w2)) * interpolatedDepth;
 						}
 						else {
-							textureColor = (vertices_NDC[indices[i]].uv * w0 +		
-											vertices_NDC[indices[i + 1]].uv * w1 + 
-											vertices_NDC[indices[i + 2]].uv * w2);
+							textureColor = (((vertices_NDC[indices[i]].uv		/ z0) * w0) +
+											((vertices_NDC[indices[i + 1]].uv	/ z1) * w1) +
+											((vertices_NDC[indices[i + 2]].uv	/ z2) * w2)) * interpolatedDepth;
 						}
-
-						//std::cout<< textureColor.x << " " << textureColor.y << std::endl;
-
-					//std::cout << vertices_NDC[indices[1]].uv.x << " " << vertices_NDC[indices[1]].uv.y << std::endl;
-						
 
 						finalColor += m_pTexture->Sample(textureColor);
 
-						// Interpolate Color
-						//ColorRGB interpolatedColor;
-						//if (topology == PrimitiveTopology::TriangleStrip && i % 2 != 0) {
-						//	interpolatedColor +=	vertices_NDC[indices[i]].color * w0 + 
-						//							vertices_NDC[indices[i + 2]].color * w1 + 
-						//							vertices_NDC[indices[i + 1]].color * w2;
-						//}
-						//else {
-						//	interpolatedColor +=	vertices_NDC[indices[i]].color * w0 + 
-						//							vertices_NDC[indices[i + 1]].color * w1 + 
-						//							vertices_NDC[indices[i + 2]].color * w2;
-						//}
-
-						// Texture Color
-						//finalColor += interpolatedColor * m_pTexture->Sample(textureColor);
-						
-
 						// Depth write
-						m_pDepthBufferPixels[pixelIndex] = depth;
+						m_pDepthBufferPixels[pixelIndex] = interpolatedDepth;
 
 						//Update Color in Buffer
 						finalColor.MaxToOne();
@@ -337,7 +313,7 @@ void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_
 		// Projection divide 
 		projected.x /= projected.w;
 		projected.y /= projected.w;
-		projected.z /= projected.w;
+		//projected.z /= projected.w;
 
 		vertices_out[i].position = projected;
 		vertices_out[i].color = vertices_in[i].color;
