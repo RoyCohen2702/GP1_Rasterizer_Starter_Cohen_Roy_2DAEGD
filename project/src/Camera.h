@@ -65,13 +65,14 @@ namespace dae
 			right = Vector3::Cross(Vector3(0, 1, 0), forward).Normalized();
 			up = Vector3::Cross(forward, right).Normalized();
 
+			
 			invViewMatrix = {
 				right,
 				up,
 				forward,
 				origin
 			};
-
+			
 			viewMatrix = invViewMatrix.Inverse();
 
 		}
