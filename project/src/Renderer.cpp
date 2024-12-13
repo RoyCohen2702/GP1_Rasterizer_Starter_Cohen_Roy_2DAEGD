@@ -411,6 +411,10 @@ void dae::Renderer::PixelShading(const std::vector<Vertex_Out>& v)
 	float lightIntensity = 7.f;
 	float shininess = 25.f;
 	Vector3 AmbientColor = { .25f, .25f, .25f };
+
+	//const ColorRGB lambertDiffuse{ cd * lightIntensity / PI};
+
+
 }
 
 bool Renderer::SaveBufferToImage() const
